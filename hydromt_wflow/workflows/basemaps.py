@@ -154,7 +154,7 @@ parametrization of distributed hydrological models.
             mask_int.raster.set_nodata(-1)  # change nodata value
             ds_out.coords["mask"] = mask_int.raster.reproject_like(
                 da_flw, method="nearest"
-            ).astype(np.bool)
+            ).astype(np.bool_)
             basins = ds_out["mask"].values.astype(np.int32)
             logger.warning(
                 "The basin delineation might be wrong as no original resolution outlets"

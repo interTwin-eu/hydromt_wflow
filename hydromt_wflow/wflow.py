@@ -2186,6 +2186,7 @@ one variable and variables list is not provided."
     def setup_temp_pet_forcing(
         self,
         temp_pet_fn: Union[str, xr.Dataset],
+        kin_fn: Union[str, xr.Dataset] = None,
         pet_method: str = "debruin",
         press_correction: bool = True,
         temp_correction: bool = True,
@@ -2306,7 +2307,18 @@ either {'temp' [°C], 'temp_min' [°C], 'temp_max' [°C], 'wind' [m/s], 'rh' [%]
                 raise ValueError(
                     f"Unknown pet method {pet_method}, select from {methods}"
                 )
-
+        
+        if kin_fn is not None:
+            ds_kin = self.data_catalog.get_rasterdataset(
+                            kin_fn,
+                            geom=self.region,
+                            buffer=1,
+                            time_tuple=(starttime, endtime),
+                            variables=["kin"],
+                            single_var_as_array=False,  # always return dataset
+                        )
+            variables.remove("kin")
+        
         ds = self.data_catalog.get_rasterdataset(
             temp_pet_fn,
             geom=self.region,
@@ -2315,6 +2327,10 @@ either {'temp' [°C], 'temp_min' [°C], 'temp_max' [°C], 'wind' [m/s], 'rh' [%]
             variables=variables,
             single_var_as_array=False,  # always return dataset
         )
+        if kin_fn is not None:
+            variables.append("kin")
+            ds["kin"] = ds_kin.kin
+
         if chunksize is not None:
             ds = ds.chunk({"time": chunksize})
 
