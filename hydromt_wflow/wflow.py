@@ -1908,6 +1908,66 @@ a map for each of the wflow_sbm soil layers (n in total)
         # Update the toml file
         self.set_config("model.thicknesslayers", wflow_thicknesslayers)
 
+    def setup_ksathorfrac(
+        self,
+        ksat_fn: Union[str, xr.DataArray],
+        variable: str | None = None,
+        resampling_method: str = "average",
+    ):
+        """Set KsatHorFrac parameter values from a predetermined map.
+
+        This predetermined map contains (preferably) 'calibrated' values of \
+the KsatHorFrac parameter. This map is either selected from the wflow Deltares data \
+or created by a third party/ individual.
+
+        Parameters
+        ----------
+        ksat_fn : str, optional
+            The identifier of the KsatHorFrac dataset in the data catalog.
+        variable : str | None, optional
+            The variable name for the ksathorfrac map to use in ``ksat_fn`` in case \
+``ksat_fn`` contains several variables. By default None.
+        resampling_method : str, optional
+            The resampling method when up- or downscaled, by default "average"
+        """
+        self.logger.info("Preparing KsatHorFrac parameter map.")
+
+        dain = self.data_catalog.get_rasterdataset(
+            ksat_fn,
+            geom=self.region,
+            buffer=2,
+            variables=variable,
+            single_var_as_array=True,
+        )
+
+        # Ensure its a DataArray
+        if isinstance(dain, xr.Dataset):
+            raise ValueError(
+                "The ksathorfrac data contains several variables. \
+Select the variable to use for ksathorfrac using 'variable' argument."
+            )
+
+        # Create scaled ksathorfrac map
+        daout = workflows.ksathorfrac(
+            dain,
+            ds_like=self.grid,
+            resampling_method=resampling_method,
+        )
+
+        # Set the output variable name
+        if not isinstance(ksat_fn, str):
+            bname = ksat_fn.name if ksat_fn.name is not None else "KsatHorFrac"
+        else:
+            bname = ksat_fn  # base name of the outgoing layer name
+
+        lname = bname
+        if variable is not None:
+            lname += f"_{variable}"
+
+        # Set the grid
+        self.set_grid(daout, name=lname)
+        self.set_config("input.lateral.subsurface.ksathorfrac", lname)
+
     def setup_glaciers(self, glaciers_fn="rgi", min_area=1):
         """
         Generate maps of glacier areas, area fraction and volume fraction.
@@ -2425,6 +2485,58 @@ either {'temp' [°C], 'temp_min' [°C], 'temp_max' [°C], 'wind' [m/s], 'rh' [%]
         temp_out.attrs.update(opt_attr)
         self.set_forcing(temp_out.where(mask), name="temp")
 
+    def setup_pet_forcing(
+        self,
+        pet_fn: Union[str, xr.DataArray],
+        chunksize: Optional[int] = None,
+    ):
+        """
+        Prepare PET forcing from existig PET data.
+
+        Adds model layer:
+
+        * **pet**: reference evapotranspiration [mm]
+
+        Parameters
+        ----------
+        pet_fn: str, xr.DataArray
+            RasterDataset source or data for PET to be resampled.
+
+            * Required variable: 'pet' [mm]
+
+        chunksize: int, optional
+            Chunksize on time dimension for processing data (not for saving to disk!).
+            If None the data chunksize is used, this can however be optimized for
+            large/small catchments. By default None.
+
+        """
+        self.logger.info("Preparing potential evapotranspiration forcing maps.")
+
+        starttime = self.get_config("starttime")
+        endtime = self.get_config("endtime")
+        freq = pd.to_timedelta(self.get_config("timestepsecs"), unit="s")
+
+        pet = self.data_catalog.get_rasterdataset(
+            pet_fn,
+            geom=self.region,
+            buffer=2,
+            variables=["pet"],
+            time_tuple=(starttime, endtime),
+        )
+
+        pet_out = workflows.forcing.pet(
+            pet=pet,
+            ds_like=self.grid,
+            freq=freq,
+            mask_name=self._MAPS["basins"],
+            chunksize=chunksize,
+            logger=self.logger,
+        )
+
+        # Update meta attributes (used for default output filename later)
+        pet_out.attrs.update({"pet_fn": pet_fn})
+        self.set_forcing(pet_out, name="pet")
+
     def setup_rootzoneclim(
         self,
         run_fn: Union[str, Path, xr.Dataset],
@@ -2663,11 +2775,13 @@ Run setup_soilmaps first"
 
         There are two methods to connect models:
 
-            - `subbasin_area`: creates subcatchments linked to the 1d river based
+        - `subbasin_area`:
+            creates subcatchments linked to the 1d river based
             on an area threshold (area_max) for the subbasin size. With this method,
             if a tributary is larger than the `area_max`, it will be connected to
             the 1d river directly.
-            - `nodes`: subcatchments are derived based on the 1driver nodes (used as
+        - `nodes`:
+            subcatchments are derived based on the 1driver nodes (used as
             gauges locations). With this method, large tributaries can also be derived
             separately using the `add_tributaries` option and adding a `area_max`
             threshold for the tributaries.
