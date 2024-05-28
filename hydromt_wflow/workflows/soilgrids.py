@@ -49,7 +49,7 @@ def concat_layers(
     variables : list
         List of soil properties to concat.
     """
-    if soil_fn == "soilgrids_2020":
+    if "soilgrids_2020" in soil_fn:
         nb_sl = 6
     else:
         nb_sl = 7
@@ -290,7 +290,7 @@ soilgrids data does not go deeper than 2 m."
         bottom_depth = wflow_depths[nl + 1]
         c_nl_sum = None
         for d in range(len(soildepth) - 1):
-            if soil_fn == "soilgrids_2020":
+            if "soilgrids_2020" in soil_fn:
                 c_av = c_sl.sel(sl=d + 1)
             else:
                 c_av = (c_sl.sel(sl=d + 1) + c_sl.sel(sl=d + 2)) / 2
@@ -510,7 +510,7 @@ index for the wflow_sbm soil layers.
     ds_out : xarray.Dataset
         Dataset containing gridded soil parameters.
     """
-    if soil_fn == "soilgrids_2020":
+    if "soilgrids_2020" in soil_fn:
         # use midpoints of depth intervals for soilgrids_2020.
         soildepth_cm_midpoint = np.array([2.5, 10.0, 22.5, 45.0, 80.0, 150.0])
         soildepth_cm_midpoint_surface = np.array([0, 10.0, 22.5, 45.0, 80.0, 150.0])
@@ -543,7 +543,7 @@ index for the wflow_sbm soil layers.
         keep_attrs=True,
     )
 
-    if soil_fn == "soilgrids_2020":
+    if "soilgrids_2020" in soil_fn:
         thetas = average_soillayers_block(thetas_sl, ds["soilthickness"])
     else:
         thetas = average_soillayers(thetas_sl, ds["soilthickness"])
@@ -561,19 +561,19 @@ index for the wflow_sbm soil layers.
         keep_attrs=True,
     )
 
-    if soil_fn == "soilgrids_2020":
+    if "soilgrids_2020" in soil_fn:
         thetar = average_soillayers_block(thetar_sl, ds["soilthickness"])
     else:
         thetar = average_soillayers(thetar_sl, ds["soilthickness"])
     thetar = thetar.raster.reproject_like(ds_like, method="average")
     ds_out["thetaR"] = thetar.astype(np.float32)
 
-    soilthickness_hr = ds["soilthickness"]
+    soilthickness_hr = ds["soilthickness"].astype(np.float32)
     soilthickness = soilthickness_hr.raster.reproject_like(ds_like, method="average")
     # wflow_sbm cannot handle (yet) zero soil thickness
     soilthickness = soilthickness.where(soilthickness > 0.0, np.nan)
     soilthickness.raster.set_nodata(np.nan)
-    soilthickness = soilthickness.astype(np.float32)
+    #soilthickness = soilthickness.astype(np.float32)
     ds_out["SoilThickness"] = soilthickness * 10.0  # from [cm] to [mm]
     ds_out["SoilMinThickness"] = xr.DataArray.copy(ds_out["SoilThickness"], deep=False)
 
@@ -647,7 +647,7 @@ index for the wflow_sbm soil layers.
     # wflow_soil map is based on soil texture calculated with percentage
     # sand, silt, clay
     # clay, silt percentages averaged over soil thickness
-    if soil_fn == "soilgrids_2020":
+    if "soilgrids_2020" in soil_fn:
         clay_av = average_soillayers_block(ds["clyppt"], ds["soilthickness"])
         silt_av = average_soillayers_block(ds["sltppt"], ds["soilthickness"])
     else:
