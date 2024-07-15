@@ -2210,7 +2210,7 @@ one variable and variables list is not provided."
         precip = self.data_catalog.get_rasterdataset(
             precip_fn,
             geom=self.region,
-            buffer=2,
+            buffer=20,
             time_tuple=(starttime, endtime),
             variables=["precip"],
         )
@@ -2382,7 +2382,7 @@ either {'temp' [°C], 'temp_min' [°C], 'temp_max' [°C], 'wind' [m/s], 'rh' [%]
         ds = self.data_catalog.get_rasterdataset(
             temp_pet_fn,
             geom=self.region,
-            buffer=1,
+            buffer=2,
             time_tuple=(starttime, endtime),
             variables=variables,
             single_var_as_array=False,  # always return dataset

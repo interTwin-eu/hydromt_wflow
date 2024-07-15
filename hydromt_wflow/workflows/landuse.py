@@ -66,7 +66,6 @@ def landuse(da, ds_like, df, logger=logger, params=None):
         ds_out[param] = da_param.raster.reproject_like(
             ds_like, method=method
         )  # then resample
-
     return ds_out
 
 
